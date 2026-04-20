@@ -197,10 +197,10 @@ const CanvasComponent = ({ totalHour, dutyType, day, logs, totalMile, sheetDay, 
     })
 
     // display aggregate time by duty
-    drawSheetText(canvas, off_duty_time, x + 24 * width + 10, y + height - 3, "25px", 400, "italic", "Arial");
-    drawSheetText(canvas, sleeper_birth_time, x + 24 * width + 5, y +  2 * height - 3, "25px", 400, "italic", "Arial");
-    drawSheetText(canvas, driving_time, x + 24 * width + 5, y + 3 * height - 3, "25px", 400, "italic", "Arial");
-    drawSheetText(canvas, on_duty_time, x + 24 * width + 5, y + 4 * height - 3, "25px", 400, "italic", "Arial");
+    drawSheetText(canvas,  Math.round(off_duty_time * 10) / 10, x + 24 * width + 10, y + height - 3, "25px", 400, "italic", "Arial");
+    drawSheetText(canvas, Math.round(sleeper_birth_time * 10) / 10, x + 24 * width + 5, y +  2 * height - 3, "25px", 400, "italic", "Arial");
+    drawSheetText(canvas, Math.round(driving_time * 10) / 10, x + 24 * width + 5, y + 3 * height - 3, "25px", 400, "italic", "Arial");
+    drawSheetText(canvas, Math.round(on_duty_time * 10) / 10, x + 24 * width + 5, y + 4 * height - 3, "25px", 400, "italic", "Arial");
 
     let total_time =  off_duty_time + sleeper_birth_time + driving_time + on_duty_time;
     drawSheetText(canvas, "=" + total_time , x + 24 * width + 5, y + height + 220 + remark_height, "25px", 400, "italic", "Arial");

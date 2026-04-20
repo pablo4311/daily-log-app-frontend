@@ -68,6 +68,11 @@ const MapboxExample = ({ scale, geometry, data }) => {
           });
         }
       });
+      return () => {
+        if (mapRef.current) {
+          mapRef.current.remove();
+        }
+      };
     } else {
       mapRef.current = new mapboxgl.Map({
         container: mapContainerRef.current,
@@ -75,17 +80,21 @@ const MapboxExample = ({ scale, geometry, data }) => {
         center: [-101.198374, 27.933061],
         zoom: 4,
       });
+      return () => {
+        if (mapRef.current) {
+          mapRef.current.remove();
+        }
+      };
     }
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-      }
-    };
   }, [geometry]);
 
   return (
     <>
-      <div id="mapbox-container" ref={mapContainerRef} className="map-container"></div>
+      <div
+        id="mapbox-container"
+        ref={mapContainerRef}
+        className="map-container"
+      ></div>
     </>
   );
 };

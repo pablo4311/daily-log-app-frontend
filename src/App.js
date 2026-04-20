@@ -15,6 +15,8 @@ import CanvasComponent from "./components/CanvasComponent";
 import { createTheme, ThemeProvider, styled } from "@mui/material/styles";
 import { green } from "@mui/material/colors";
 import isEmpty from "./utils/empty";
+import { Formik, Field, Form, ErrorMessage } from "formik";
+import * as Yup from "yup";
 
 import {
   SearchBox,
@@ -43,12 +45,29 @@ const darkTheme = createTheme({
     },
   },
 });
+
+const validationSchema = Yup.object({
+  currentLocation: Yup.string()
+    .required("Current location is required")
+    .min(3, "Location must be at least 3 characters"),
+  pickupLocation: Yup.string()
+    .required("Pickup location is required")
+    .min(3, "Location must be at least 3 characters"),
+  dropoffLocation: Yup.string()
+    .required("Dropoff location is required")
+    .min(3, "Location must be at least 3 characters"),
+  lifeCycleUsed: Yup.number()
+    .required("Current Cycle Used is required")
+    .min(0, "Cycle used cannot be negative")
+    .typeError("Current Cycle Used must be a number"),
+});
+
 const App = () => {
   const [value, setValue] = useState({
     currentLocation: "",
     pickupLocation: "",
     dropoffLocation: "",
-    currentCycleUsed: 0,
+    lifeCycleUsed: null,
   });
 
   const [loading, setLoading] = useState(false);
@@ -59,14 +78,7 @@ const App = () => {
 
   const [disableViewLogs, setDisableViewLogs] = useState(true);
 
-  // states for validation
-  const [validationErrors, setValidationErrors] = useState({
-    currentLocationError: "",
-    pickupLocationError: "",
-    dropoffLocationError: "",
-    currentCycleUsedError: "",
-  });
-
+ 
 
   const [scale, setScale] = useState([0, 0]);
   const [geometry, setGeometry] = useState({});
@@ -115,76 +127,28 @@ const App = () => {
       [key]: key === "currentCycleUsed" ? e.target.value : e,
     });
     if (key === "currentCycleUsed") {
-      setData({ ...data, currentCycleUsed: e.target.value });
+      setData({ ...data, lifeCycleUsed: parseInt(e.target.value, 10) });
     }
   };
 
-  const validate = async() => {
-      
-      if(data.currentLocation.x == null|| data.currentLocation.y == null)
-      {
-        console.log("here");
-        setValidationErrors({
-          ...validationErrors,
-          "currentLocationError" : "Invalid current location"
-        });
-
-
-        setLoading(false);
-        
-      }
-      if(data.pickupLocation.x == null|| data.pickupLocation.y == null)
-      {
-        setValidationErrors({
-          ...validationErrors,
-          "pickupLocationError" : "Invalid pickup location"
-        });
-
-        setLoading(false);
-      }
-      if(data.dropoffLocation.x == null|| data.dropoffLocation.y == null)
-      {
-        console.log("asdfa");
-        setValidationErrors({
-          ...validationErrors,
-          "dropoffLocationError" : "Invalid dropoff location"
-        });
-        setLoading(false);
-      }
-      if(data.lifeCycleUsed < 0)
-      {
-        setValidationErrors({
-          ...validationErrors,
-          "currentCycleUsedError" : "Invalid Current Cycle Used"
-        });
-
-        setLoading(false);
-      }
-  }
-
-  const handleGenerate = async () => {
-    validate();
-    console.log(validationErrors);
+  const handleGenerate = async (values) => {
     setLoading(true);
-    validationErrors.length == 0 && 
     axiosInstance
       .post("/api/generate_route/", data) // Add your endpoint here
       .then((response) => {
         if (response.data) {
-
           setDisableViewLogs(false);
 
           setTotalMiles(response.data.total_distance_miles);
           setSheetYear(response.data.year);
           setSheetMonth(response.data.month);
           setSheetDay(response.data.day);
-          
 
           setGeometry({ ...response.data.geometry });
           setDay(response.data.day_count);
           setLogsByDaily(response.data.logs_by_daily);
         }
-       
+
         setLoading(false);
       })
       .catch((error) => {
@@ -193,21 +157,22 @@ const App = () => {
       });
   };
 
-  const handleRetrieve = (key) => (e) => {
-    if(!isEmpty(e)){
-      setValue({
-       ...value,
-       [key]: e.features[0].properties.name,
-     });
-     setData({
-       ...data,
-       [key]: {
-         x: e.features[0].geometry.coordinates[0],
-         y: e.features[0].geometry.coordinates[1],
-       },
-     });
+  const handleRetrieve = (key, setFieldValue) => (e) => {
+    if (!isEmpty(e)) {
+      setFieldValue(key, e.features[0].properties.name)
+      setData({
+        ...data,
+        [key]: {
+          x: e.features[0].geometry.coordinates[0],
+          y: e.features[0].geometry.coordinates[1],
+        },
+      });
     }
   };
+
+  const hanldeClear = (key, setFieldValue) => () => {
+    setFieldValue(key, "")
+  }
 
   const handleShowDialog = () => {
     setShowDialogStatus(!showDialogStatus);
@@ -225,13 +190,13 @@ const App = () => {
         handleDialogClose={handleDialogClose}
         totalHour={totalHour}
         dutyType={dutyType}
-        day = {day}
-        logs = {logsByDaily}
-        totalMile = {totalMile}
-        sheetDay = {sheetDay}
-        sheetMonth = {sheetMonth}
-        sheetYear = {sheetYear}
-        value = {value}
+        day={day}
+        logs={logsByDaily}
+        totalMile={totalMile}
+        sheetDay={sheetDay}
+        sheetMonth={sheetMonth}
+        sheetYear={sheetYear}
+        value={value}
       />
       <Grid container spacing={2} sx={{ p: 2 }}>
         <Grid size={{ xs: 12, md: 8 }}>
@@ -239,106 +204,120 @@ const App = () => {
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <Item sx={{ p: 4 }}>
-            <Box sx={{ textAlign: "left", py: 1 }}>
-              <Box sx={{pb:1}}>Current Location</Box>
-              <SearchBox
-                options={{
-                  proximity: {
-                    lng: -122.431297,
-                    lat: 37.773972,
-                  },
-                }}
-                placeholder={"Current Location"}
-                onRetrieve={handleRetrieve("currentLocation")}
-                value={value.currentLocation}
-                onChange={handleChangeValue("currentLocation")}
-                accessToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
-              />
-              {
-                validationErrors.currentLocationError !== "" &&
-                <Typography variant="caption" sx={{ color: 'red' }}>
-                    {validationErrors.currentLocationError}
-                </Typography>
-              }
-            </Box>
-            <Box sx={{ textAlign: "left", py: 1 }}>
-              <Box sx={{pb:1}}>Pickup Location</Box>
-              <SearchBox
-                options={{
-                  proximity: {
-                    lng: -122.431297,
-                    lat: 37.773972,
-                  },
-                }}
-                placeholder={"Pickup Location"}
-                onRetrieve={handleRetrieve("pickupLocation")}
-                value={value.pickupLocation}
-                onChange={handleChangeValue("pickupLocation")}
-                accessToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
-              />
-
-              {
-                validationErrors.pickupLocationError !== "" &&
-                <Typography variant="caption" sx={{ color: 'red' }}>
-                    {validationErrors.pickupLocationError}
-                </Typography>
-              }
-            </Box>
-            <Box sx={{ textAlign: "left", py: 1 }}>
-              <Box sx={{pb:1}}>Dropoff Location</Box>
-              <SearchBox
-                options={{
-                  proximity: {
-                    lng: -122.431297,
-                    lat: 37.773972,
-                  },
-                }}
-                placeholder={"Dropoff Location"}
-                onRetrieve={handleRetrieve("dropoffLocation")}
-                value={value.dropoffLocation}
-                onChange={handleChangeValue("dropoffLocation")}
-                accessToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
-              />
-
-              {
-                validationErrors.dropoffLocationError !== "" &&
-                <Typography variant="caption" sx={{ color: 'red' }}>
-                    {validationErrors.dropoffLocationError}
-                </Typography>
-              }
-
-            </Box>
-            <TextField
-              id="outlined-basic4"
-              label="Current Cycle Used (Hrs)"
-              type="number"
-              variant="outlined"
-              sx={{ width: "100%", my: 2 }}
-              value={value.currentCycleUsed}
-              onChange={handleChangeValue("currentCycleUsed")}
-            />
-            {
-              validationErrors.currentCycleUsedError !== "" &&
-              <Typography variant="caption" sx={{ color: 'red' }}>
-                  {validationErrors.currentCycleUsedError}
-              </Typography>
-            }
-            <Button
-              variant="contained"
-              sx={{ width: "100%", my: 2, color: "white" }}
-              loading={loading}
-              onClick={handleGenerate}
+            <Formik
+              initialValues={value}
+              validationSchema={validationSchema}
+              onSubmit={handleGenerate}
             >
-              Generate Route
-            </Button>
-            <Button
-              variant="contained"
-              sx={{ width: "100%", my: 2, color: "white" }}
-              onClick={handleShowDialog}
-              disabled = {disableViewLogs}
-            >
-              View Logs
-            </Button>
+              {({ setFieldValue, values }) => (
+                <Form>
+                  <Box sx={{ textAlign: "left", py: 1 }}>
+                    <Box sx={{ pb: 1 }}>Current Location</Box>
+                    <SearchBox
+                      options={{
+                        proximity: {
+                          lng: -122.431297,
+                          lat: 37.773972,
+                        },
+                      }}
+                      placeholder={"Current Location"}
+                      onRetrieve={handleRetrieve("currentLocation", setFieldValue)}
+                      onClear={hanldeClear("currentLocation", setFieldValue)}
+                      value={values.currentLocation}
+                      onChange={handleChangeValue("currentLocation")}
+                      accessToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
+                    />
+                    <ErrorMessage
+                      name="currentLocation"
+                      component="div"
+                      style={{ color: "red" }}
+                    />
+                  </Box>
+                  <Box sx={{ textAlign: "left", py: 1 }}>
+                    <Box sx={{ pb: 1 }}>Pickup Location</Box>
+                    <SearchBox
+                      options={{
+                        proximity: {
+                          lng: -122.431297,
+                          lat: 37.773972,
+                        },
+                      }}
+                      placeholder={"Pickup Location"}
+                      onRetrieve={handleRetrieve("pickupLocation", setFieldValue)}
+                      onClear={hanldeClear("pickupLocation", setFieldValue)}
+                      value={values.pickupLocation}
+                      onChange={handleChangeValue("pickupLocation")}
+                      accessToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
+                    />
+
+                    <ErrorMessage
+                      name="pickupLocation"
+                      component="div"
+                      style={{ color: "red" }}
+                    />
+                  </Box>
+                  <Box sx={{ textAlign: "left", py: 1 }}>
+                    <Box sx={{ pb: 1 }}>Dropoff Location</Box>
+                    <SearchBox
+                      options={{
+                        proximity: {
+                          lng: -122.431297,
+                          lat: 37.773972,
+                        },
+                      }}
+                      placeholder={"Dropoff Location"}
+                      onRetrieve={handleRetrieve("dropoffLocation", setFieldValue)}
+                      onClear={hanldeClear("dropoffLocation", setFieldValue)}
+                      value={values.dropoffLocation}
+                      onChange={handleChangeValue("dropoffLocation")}
+                      accessToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
+                    />
+
+                    <ErrorMessage
+                      name="dropoffLocation"
+                      component="div"
+                      style={{ color: "red" }}
+                    />
+                  </Box>
+                  <Box sx={{ textAlign: "left", py: 1 }}>
+                  <Field
+                    name="lifeCycleUsed"
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        id="outlined-basic4"
+                        label="Current Cycle Used (Hrs)"
+                        type="number"
+                        variant="outlined"
+                        sx={{ width: "100%", my: 2 }}
+                      />
+                    )}
+                  />
+                  <ErrorMessage
+                    name="lifeCycleUsed"
+                    component="div"
+                    style={{ color: "red" }}
+                  />
+                  </Box>
+                  <Button
+                    variant="contained"
+                    sx={{ width: "100%", my: 2, color: "white" }}
+                    loading={loading}
+                    type="submit"
+                  >
+                    Generate Route
+                  </Button>
+                  <Button
+                    variant="contained"
+                    sx={{ width: "100%", my: 2, color: "white" }}
+                    onClick={handleShowDialog}
+                    disabled={disableViewLogs}
+                  >
+                    View Logs
+                  </Button>
+                </Form>
+              )}
+            </Formik>
           </Item>
         </Grid>
       </Grid>
